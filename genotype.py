@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 
 # imports
-import sys, argparse, unittest
+import sys, argparse, unittest, StringIO
 
 
 # set script meta vars
@@ -48,9 +48,8 @@ def getArgs(args):
     # send back the user input
     return args
 
-#TODO test reader
 
-def reader(inputFile):
+def parser(inputFile):
     """Generator function. Parses muliplexed genotyping experiments file"""
     # list to collect lines for each experiment
     experiment = []
@@ -66,15 +65,56 @@ def reader(inputFile):
             experiment = []
 
     inputFile.close()
-    
+
     # make sure to yield final experiment
     if experiment: yield experiment
 
 class TestReader(unittest.TestCase):
-
+    """Unittest class for testing reader functionality."""
     def setUp(self):
-        self.inputFile = StringIO
+        # simulate input file for testing
+        self.inputFile = StringIO.StringIO((
+            "NORM,0,1\n"
+            "NORM,1,2\n"
+            "NORM,0,2\n"
+            "\n"
+            "NORM,100,110\n"
+            "MUT,110,12\n"
+            "\n"
+            "NORM,0,1\n"
+            "MUT,1,2\n"
+            "NORM,1,3\n"
+            "NORM,2,3\n"
+            "\n"
+            "MUT,0,1\n"
+            "MUT,1,2\n"
+            "\n"))
+
+        # expected output from test input
+        self.experiments = [
+            [["NORM","0","1"],
+            ["NORM","1","2"],
+            ["NORM","0","2"]],
+
+            [["NORM","100","110"],
+            ["MUT","110","12"]],
+
+            [["NORM","0","1"],
+            ["MUT","1","2"],
+            ["NORM","1","3"],
+            ["NORM","2","3"]],
+
+            [["MUT","0","1"],
+            ["MUT","1","2"]]
+            ]
+
     def test_reader(self):
+        """TEST READER FUNCTIONALITY"""
+        # get all experiments from simulated input
+        experiments = [x for x in parser(self.inputFile)]
+        # check that output matches expectation
+        self.assertEqual(experiments,self.experiments)
+
 
 
 # TODO test process
@@ -127,10 +167,12 @@ def evaluate(experiment):
     print(len(all))
     # TODO implement unique mapping test
 def main():
-    args = getArgs(sys.argv[1:])
-    for exp in reader(args.input):
-        print("____")
-        evaluate(exp)
+    # args = getArgs(sys.argv[1:])
+    # for exp in reader(args.input):
+    #     print("____")
+    #     evaluate(exp)
+    unittest.main()
+
 
 
 if __name__ == '__main__':
