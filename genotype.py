@@ -99,6 +99,8 @@ def evaluate(experiment):
     filteredMutants = [test - normals for test in mutants]
 
     # get MUT tests that can be narrowed down to a single mutant
+    # next(iter(x)) is a trick to get the value from a set of len 1
+    #   WITHOUT leaving an empty set behind.
     singleMutants = set([next(iter(x)) for x in filteredMutants if len(x) == 1])
 
     # if singleMutants merged with normals doesn't cover all samples,
@@ -118,7 +120,7 @@ def evaluate(experiment):
     # return True flag for success as well as the results
     return True, [singleMutants, normals]
 
-def write(success, result, outputFile):
+def writer(success, result, outputFile):
     if not success:
         outputFile.write(result)
         outputFile.write("\n")
@@ -126,9 +128,14 @@ def write(success, result, outputFile):
     elif success:
         # unpack results sets
         singleMutants, normals = result
+        # list to store all calls
         all = []
+
+        # get mutant and normal counts
         nMut = len(singleMutants)
         nNorm = len(normals)
+
+        # append sampleIDs and corresponding results to all
         for sampleID in singleMutants:
             all.append((sampleID, "MUT"))
         for sampleID in normals:
@@ -137,14 +144,16 @@ def write(success, result, outputFile):
         # sort all by sampleIDs
         all.sort(key=lambda x: int(x[0]))
 
+        # write totals to output
         outputFile.write("MUT COUNT: {0}\n".format(nMut))
         outputFile.write("NORM COUNT: {0}\n".format(nNorm))
+
+        # write sample calls to output
         for line in all:
             outputFile.write(",".join(line)+"\n")
+
+    # newline delimits each experiment
     outputFile.write("\n")
-
-
-
 
 
 class Tester(unittest.TestCase):
@@ -199,15 +208,15 @@ class Tester(unittest.TestCase):
         self.assertEqual(0,0)
 
 def main():
+    # get command line arguments
     args = getArgs(sys.argv[1:])
 
+    # iterate over each experiment from input file using reader
     for experiment in parser(args.input):
+        # get success flag and results by evaluating experiment
         success, results = evaluate(experiment)
-        write(success, results, args.output)
-    # unittest.main()
-
-
+        # write the results to output
+        writer(success, results, args.output)
 
 if __name__ == '__main__':
-    # unittest.main()
     main()
