@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 
 # imports
-import sys, argparse, unittest, StringIO
+import sys, argparse, unittest, StringIO, collections
 
 
 # set script meta vars
 __author__ = "Ryan Smith (ryan.smith.p@gmail.com)"
 __version__ = "0.1.0"
-__date__ = "2018-06-13 "
+__date__ = "2018-06-13"
 
 
 #TODO test get_args
@@ -16,29 +16,29 @@ def getArgs(args):
     # init parser
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
-        description="author: " + __author__ + "\nversion: " + __version__)
+        description="author: " + __author__ + "\nversion: " + __version__
+        )
 
     # add input argument
     parser.add_argument(
-        '-i',
-        '--input',
+        '-i', '--input',
         type=argparse.FileType('r'),
-        required=False,
-        default=None,
-        help="Input file [stdin]")
+        required=False, default=None,
+        help="Input file [stdin]"
+        )
 
     # add output argument
     parser.add_argument(
-        '-o',
-        '--output',
+        '-o', '--output',
         type=argparse.FileType('w'),
-        required=False,
-        default=sys.stdout,
-        help="Output file [stdout]")
+        required=False, default=sys.stdout,
+        help="Output file [stdout]"
+        )
 
     # parse the user arguments
     args = parser.parse_args(args)
-    # if no input, check if part of pipe and if so, read stdin.
+
+    # if no input arg, check if part of pipe and if so, read stdin.
     if args.input is None:
         if sys.stdin.isatty():
             parser.print_help()
@@ -69,8 +69,86 @@ def parser(inputFile):
     # make sure to yield final experiment
     if experiment: yield experiment
 
-class TestReader(unittest.TestCase):
-    """Unittest class for testing reader functionality."""
+
+def evaluate(experiment):
+    """Evaluates a single multiplexing experiment"""
+    # stores all sample ids
+    all = set()
+    # stores normal sample ids
+    normals = set()
+    # stores each mutant callset
+    mutants = []
+
+    # for each test,
+    for test in experiment:
+        # get MUT or NORM state at variant
+        state = test[0]
+        samples = test[1:]
+
+        # add samples to all set
+        all.update(samples)
+
+        # collect mutant test sets separately
+        if state == "MUT":
+            mutants.append(set(samples))
+        # collect normal test ids in a single set
+        elif state == "NORM":
+            normals.update(samples)
+
+    # for each mutant test set, remove samples called in normal tests
+    filteredMutants = [test - normals for test in mutants]
+
+    # get MUT tests that can be narrowed down to a single mutant
+    singleMutants = set([next(iter(x)) for x in filteredMutants if len(x) == 1])
+
+    # if singleMutants merged with normals doesn't cover all samples,
+    # at least one sample was never uniquely identified as mutant.
+    if len(normals | singleMutants) != len(all):
+        # return False flag for failure and the failure type
+        return False, "NONUNIQUE"
+
+    # if any mutant test gets filtered to 0 elements,
+    # all of these test samples were identified in normal tests
+    # this can only happen with an erroneous NORMAL or MUTANT genotype call.
+    for test in filteredMutants:
+        if len(test) == 0:
+            # return False flag for failure and the failure type
+            return False, "INCONSISTENT"
+
+    # return True flag for success as well as the results
+    return True, [singleMutants, normals]
+
+def write(success, result, outputFile):
+    if not success:
+        outputFile.write(result)
+        outputFile.write("\n")
+
+    elif success:
+        # unpack results sets
+        singleMutants, normals = result
+        all = []
+        nMut = len(singleMutants)
+        nNorm = len(normals)
+        for sampleID in singleMutants:
+            all.append((sampleID, "MUT"))
+        for sampleID in normals:
+            all.append((sampleID, "NORM"))
+
+        # sort all by sampleIDs
+        all.sort(key=lambda x: int(x[0]))
+
+        outputFile.write("MUT COUNT: {0}\n".format(nMut))
+        outputFile.write("NORM COUNT: {0}\n".format(nNorm))
+        for line in all:
+            outputFile.write(",".join(line)+"\n")
+    outputFile.write("\n")
+
+
+
+
+
+class Tester(unittest.TestCase):
+    """Class for defining unit tests"""
     def setUp(self):
         # simulate input file for testing
         self.inputFile = StringIO.StringIO((
@@ -108,72 +186,28 @@ class TestReader(unittest.TestCase):
             ["MUT","1","2"]]
             ]
 
-    def test_reader(self):
-        """TEST READER FUNCTIONALITY"""
+    def test_parser(self):
+        """TEST PARSER FUNCTIONALITY"""
         # get all experiments from simulated input
-        experiments = [x for x in parser(self.inputFile)]
+        self.testExperiments = [x for x in parser(self.inputFile)]
         # check that output matches expectation
-        self.assertEqual(experiments,self.experiments)
+        self.assertEqual(self.testExperiments, self.experiments)
 
+    # TODO implement this test
+    def test_evaluate(self):
+        """TEST PARSER FUNCTIONALITY"""
+        self.assertEqual(0,0)
 
-
-# TODO test process
-def evaluate(experiment):
-    """Evaluates a single multiplexing experiment"""
-    # sets to store normal and mutant sample IDs
-    all = set()
-    normals = set()
-    mutantSet = set()
-    mutants = []
-
-    # for each test,
-    for test in experiment:
-        # get MUT or NORM state at variant
-        state = test[0]
-        samples = test[1:]
-        all.update(samples)
-        # collect mutant test sets separately
-        if state == "MUT":
-            mutantSet.update(samples)
-            mutants.append(set(samples))
-        # collect normal test ids in a single set
-        elif state == "NORM":
-            normals.update(samples)
-
-    # for each mutant test set, remove samples called in normal tests
-    filteredMutants = [test - normals for test in mutants]
-
-
-    # get tests narrowed down to a single mutant
-    singleMutants = set([next(iter(x)) for x in filteredMutants if len(x) == 1])
-
-
-    if len(singleMutants) < 1 and len(mutants) > 0:
-        # print(singleMutants)
-        print("NONUNIQUE")
-
-    if len(normals | singleMutants) != len(all):
-        print("NONUNIQUE")
-
-    for x in filteredMutants:
-        if len(x) == 0:
-            print("INCONSISTENT")
-            break
-
-    print(len(singleMutants))
-    print(len(normals))
-    print(len(normals) + len(singleMutants))
-    print(len(normals | singleMutants))
-    print(len(all))
-    # TODO implement unique mapping test
 def main():
-    # args = getArgs(sys.argv[1:])
-    # for exp in reader(args.input):
-    #     print("____")
-    #     evaluate(exp)
-    unittest.main()
+    args = getArgs(sys.argv[1:])
+
+    for experiment in parser(args.input):
+        success, results = evaluate(experiment)
+        write(success, results, args.output)
+    # unittest.main()
 
 
 
 if __name__ == '__main__':
+    # unittest.main()
     main()
