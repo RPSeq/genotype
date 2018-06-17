@@ -30,7 +30,7 @@ def get_args(args):
         description="author: " + __author__ + "\nversion: " + __version__
         )
 
-    # add output argument
+    # add test argument
     parser.add_argument(
         '-t', '--test',
         action='store_true',
