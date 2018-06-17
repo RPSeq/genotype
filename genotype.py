@@ -20,7 +20,7 @@ except ImportError:
 # set script meta vars
 __author__ = "Ryan Smith (ryan.smith.p@gmail.com)"
 __version__ = "0.1.0"
-__date__ = "2018-06-13"
+__date__ = "2018-06-16"
 
 def get_args(args):
     """Defines the command-line interface"""
@@ -60,7 +60,8 @@ def get_args(args):
     # send back the user input
     return args, parser
 
-def set_inputs(args, parser):
+def set_io(args, parser):
+    """Opens file handles depending on user arguments"""
     # if no input arg, check if part of pipe and if so, read stdin.
     if args.input is None:
         if sys.stdin.isatty():
@@ -71,7 +72,6 @@ def set_inputs(args, parser):
     # otherwise, open input by filename
     else:
         args.input = open(args.input, 'r')
-
     # if no output specified, set to stdout
     if args.output is None:
         args.output = sys.stdout
@@ -210,25 +210,37 @@ def output_results(success, result, output_file):
 class TestArgs(unittest.TestCase):
     """Class for defining unit tests"""
 
-    def test_get_args_input(self):
-        """TEST get_args FUNCTIONALITY"""
+    def test_get_args_testflag(self):
+        """TEST get_args test FUNCTIONALITY"""
         # test flag
-        args, parser = get_args(["-t"])
+        args = get_args(["-t"])[0]
         self.assertTrue(args.test)
+
+    def test_get_args_input(self):
+        """TEST get_args input FUNCTIONALITY"""
         # only define input file
-        args, parser = get_args(["-i", "input"])
+        args = get_args(["-i", "input"])[0]
         self.assertEqual(args.input, "input")
         self.assertEqual(args.output, None)
+
+    def test_get_args_output(self):
+        """TEST get_args output FUNCTIONALITY"""
         # only define output file
-        args, parser = get_args(["-o", "output"])
+        args = get_args(["-o", "output"])[0]
         self.assertEqual(args.input, None)
         self.assertEqual(args.output, "output")
+
+    def test_get_args_input_output(self):
+        """TEST get_args input output FUNCTIONALITY"""
         # define both
-        args, parser = get_args(["-i", "input", "-o", "output"])
+        args = get_args(["-i", "input", "-o", "output"])[0]
         self.assertEqual(args.input, "input")
         self.assertEqual(args.output, "output")
+
+    def test_get_args_no_args(self):
+        """TEST get_args no args FUNCTIONALITY"""
         # define none
-        args, parser = get_args([])
+        args = get_args([])[0]
         self.assertEqual(args.input, None)
         self.assertEqual(args.output, None)
 
@@ -309,10 +321,6 @@ class TestUtilities(unittest.TestCase):
 # TEST SUITE #
 class TestGenotype(unittest.TestCase):
     """Class for defining higher-level genotyping functions"""
-
-    # pylint: disable=too-many-instance-attributes
-    # I need to include a lot of test attributes,
-    #   as only one file is allowed for submission
 
     def setUp(self):
         """Init test module"""
@@ -420,12 +428,12 @@ def main():
     args, parser = get_args(sys.argv[1:])
     # if test flag, run tests
     if args.test:
-        # with tests in same file, unittest.main() still gets argv
-        # clear argv
+        # with tests in same file, unittest.main() still gets sys.argv
+        # so, clear sys.argv before running unittest
         sys.argv = sys.argv[:1]
         unittest.main()
     # open file handles
-    set_inputs(args, parser)
+    set_io(args, parser)
     # iterate over each experiment from input file using reader
     for experiment in input_parser(args.input):
         # get success flag and results
